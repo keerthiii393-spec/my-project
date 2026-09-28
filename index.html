@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FreeRoom – Find an empty room</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f5f1;--card:#fff;--ink:#1d2320;--mut:#69726d;--line:#e2e0d8;--acc:#1f6f5c;--accbg:#e3f1ec;--busy:#b4462f;--busybg:#f8e7e2;--free:#1f6f5c;--freebg:#e3f1ec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141816;--card:#1d2320;--ink:#ecefed;--mut:#98a39d;--line:#2c3430;--acc:#5fc4a5;--accbg:#1d3a31;--busy:#f0907a;--busybg:#3b2621;--free:#5fc4a5;--freebg:#1d3a31}}
+:root[data-theme="dark"]{--bg:#141816;--card:#1d2320;--ink:#ecefed;--mut:#98a39d;--line:#2c3430;--acc:#5fc4a5;--accbg:#1d3a31;--busy:#f0907a;--busybg:#3b2621;--free:#5fc4a5;--freebg:#1d3a31}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:26px;margin:0 0 2px;letter-spacing:-.02em}
+.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:0 0 10px}
+.ai{display:flex;gap:8px;flex-wrap:wrap}
+.ai textarea{flex:1 1 300px;min-height:64px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;background:var(--bg);color:var(--ink)}
+button{font:inherit;border:0;border-radius:10px;padding:10px 16px;background:var(--acc);color:#fff;cursor:pointer;font-weight:600}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button{color:#0d1512}}
+button.ghost{background:var(--accbg);color:var(--acc)}
+button:disabled{opacity:.5;cursor:wait}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:12.5px;padding:4px 10px;border-radius:99px;background:var(--accbg);color:var(--acc);border:0;font-weight:500}
+.crit{margin-top:12px;font-size:13.5px;color:var(--mut)}
+.crit b{color:var(--ink)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px}
+select,input[type=time],input[type=date],input[type=number],#ahol{font:inherit;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.floor{margin-bottom:18px}
+.floor h3{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between}
+.floor h3 span{color:var(--mut);font-weight:400;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.room{border-radius:12px;padding:12px;border:1px solid var(--line);border-left-width:5px}
+.room.free{background:var(--freebg);border-left-color:var(--free)}
+.room.busy{background:var(--busybg);border-left-color:var(--busy)}
+.room.hit{outline:2px solid var(--acc);outline-offset:2px}
+.room .top{display:flex;justify-content:space-between;font-weight:700}
+.room .st{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.free .st{color:var(--free)}.busy .st{color:var(--busy)}
+.room .meta{font-size:12.5px;color:var(--mut);margin-top:3px}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);margin-right:4px;color:var(--mut)}
+.res{display:grid;gap:8px}
+.hitrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--freebg);border-left:5px solid var(--free)}
+.empty{color:var(--mut);padding:8px 0}
+details summary{cursor:pointer;color:var(--mut);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;display:block;overflow-x:auto}
+td,th{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;white-space:nowrap}
+
+#stage{position:relative;height:730px;perspective:3200px;overflow:hidden;touch-action:none;cursor:grab;border-radius:12px;background:radial-gradient(ellipse at 50% 30%,var(--card),var(--bg));border:1px solid var(--line)}
+#bld{position:absolute;left:50%;top:50%;width:300px;height:150px;margin:-75px 0 0 -150px;transform-style:preserve-3d}
+.fl{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--card) 55%,transparent);transform-style:preserve-3d;transform:translateZ(var(--z))}
+.fltag{position:absolute;left:4px;top:-16px;font-size:11px;color:var(--mut);white-space:nowrap}
+.tile{border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;color:#fff;transform:translateZ(7px);box-shadow:0 0 0 1px rgba(0,0,0,.25),0 10px 14px rgba(0,0,0,.35);cursor:pointer;transition:background .4s,transform .2s;user-select:none;line-height:1.2}
+.tile i{font-style:normal;font-size:9px;opacity:.95}
+.tile.free{background:#2e9e7f}.tile.soon{background:#d9a21b}.tile.busy{background:#c4553b}.tile.closed{background:#7a827e}
+.tile.hit{box-shadow:0 0 0 3px gold,0 10px 14px rgba(0,0,0,.35)}
+.tile.claim{box-shadow:0 0 0 3px #3b82f6,0 10px 14px rgba(0,0,0,.35)}
+.tile.sel{transform:translateZ(22px);outline:3px solid #fff;pointer-events:none}
+.maphd{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:13px;color:var(--mut)}
+.maphd b{color:var(--ink)}.leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 10px;vertical-align:-1px}
+.pn{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between;margin-top:12px;padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.pn h3{margin:0 0 4px;font-size:20px}.pn h3 small{font-size:12px;color:var(--mut);font-weight:400}
+.cdw{min-width:230px;flex:1 1 230px;text-align:right}.cdl{font-size:12.5px;color:var(--mut)}
+.cd{font:700 40px/1.15 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--line);border-radius:9px;margin-top:6px}#pbar{height:100%;background:var(--acc);border-radius:9px;transition:width 1s linear}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+a.btn{font:inherit;font-weight:600;border-radius:10px;padding:10px 16px;text-decoration:none;display:inline-block}a.wa{background:#25D366;color:#06210f}
+.room,.hitrow{cursor:pointer}
+.nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 16px}.nav a{font-size:13px;padding:5px 12px;border-radius:99px;background:var(--accbg);color:var(--acc);text-decoration:none;font-weight:600}.nav span{margin-left:auto;font-size:13px;font-weight:600;color:var(--free)}
+html{scroll-behavior:smooth}
+
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.stat b{font-size:22px;display:block}.stat span{font-size:12px;color:var(--mut)}
+.acard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;background:var(--bg)}.ahd small{display:block;color:var(--mut);font-size:12.5px}
+.ain{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.ain input{width:130px}.ares div{font-size:13.5px;margin-top:4px}
+.chip2{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;margin-left:6px}
+.c-ok{background:var(--freebg);color:var(--free)}.c-warn{background:#f6e7bf;color:#8a5a00}.c-bad{background:var(--busybg);color:var(--busy)}
+.alarm{background:#b4231a;color:#fff;border-radius:14px;padding:18px;margin:12px 0;font-weight:700;animation:pulse 1s infinite;border:3px solid #ffb3ab}
+.alarm h3{margin:0 0 6px;font-size:24px;letter-spacing:.03em}.alarm div{font-weight:500;font-size:14.5px;margin-top:3px}
+@keyframes pulse{50%{box-shadow:0 0 0 10px rgba(180,35,26,.35);background:#d32b20}}
+</style></head>
+<body><main>
+<h1>FreeRoom</h1>
+<p class="sub">Find an empty classroom right now: explore the 3D map, ask the AI, browse by floor, or plan your attendance. Built from 6 section timetables (II ECE-DS A/B, I ECE-A, I ECE-B/EEE, I ECE-DS, I Biotech-B): rooms, periods, subjects and faculty come straight from the PDFs.</p>
+
+<nav class="nav"><a href="#ai">Ask AI</a><a href="#map">3D map</a><a href="#floors">Floor grid</a><a href="#attend">Attendance</a><a href="#settings">Room settings</a><span id="stat"></span></nav>
+<section class="card" id="ai">
+  <h2>AI room finder</h2>
+  <div class="ai">
+    <textarea id="q" placeholder="e.g. I need an AC room on the ground floor for me and my team for the next 2 hours"></textarea>
+    <button id="go">Find rooms</button>
+  </div>
+  <div class="chips" id="ex"></div>
+  <div class="crit" id="crit"></div>
+  <div class="res" id="res" style="margin-top:10px"></div>
+</section>
+
+<section class="card" id="map">
+  <h2>3D building map</h2>
+  <div class="maphd"><span>🕒 <b id="clock"></b></span><span id="mode"></span><button class="ghost" id="reset" style="padding:5px 12px">Reset view</button>
+  <span class="leg"><i style="background:#2e9e7f"></i>Free<i style="background:#d9a21b"></i>Free &lt;15 min<i style="background:#c4553b"></i>In class<i style="background:#7a827e"></i>Closed<i style="background:#3b82f6"></i>Claimed<i style="background:gold"></i>AI match</span></div>
+  <div id="stage"><div id="bld"></div></div>
+  <div class="empty" style="font-size:12.5px">Drag to rotate · tap a room for its live countdown · claim it, then call your squad on WhatsApp.</div>
+  <div id="panel"></div>
+</section>
+
+<section class="card" id="floors">
+  <h2>Floor grid</h2>
+  <div class="filters">
+    <label>Day<select id="day"></select></label>
+    <label>Time<input type="time" id="time"></label>
+    <button class="ghost" id="now">Now</button>
+    <label>AC<select id="fac"><option value="">Any</option><option value="1">AC only</option><option value="0">Non-AC only</option></select></label>
+    <label>Type<select id="ftype"><option value="">All</option><option value="class">Classrooms</option><option value="lab">Labs</option></select></label>
+    <label>Show<select id="fst"><option value="">All rooms</option><option value="free">Free only</option></select></label>
+  </div>
+  <div id="grid" style="margin-top:16px"></div>
+</section>
+
+<section class="card" id="attend">
+  <h2>Attendance planner</h2>
+  <div class="filters"><label>Your section<select id="asec"></select></label><label>Plan for date<input type="date" id="apd"></label><label>Danger below (%)<input type="number" id="adz" value="75" min="1" max="100" style="width:80px"></label><label>Target (%)<input type="number" id="atg" value="90" min="1" max="100" style="width:80px"></label></div>
+  <div class="filters" style="margin-top:10px"><label>Semester starts (assumed)<input type="date" id="ast" value="2026-08-03"></label><label>Semester ends (assumed)<input type="date" id="aen" value="2026-10-31"></label><label style="flex:1 1 220px">Holidays (YYYY-MM-DD, comma separated)<input type="text" id="ahol" value="2026-10-02"></label></div>
+  <p class="sub" id="atoday" style="margin:10px 0 0"></p>
+  <div id="aalert"></div><div class="grid" id="asum" style="margin-top:10px"></div><div id="atab"></div>
+  <p class="empty" style="font-size:12.5px">Enter your attendance % for each subject (leave a subject blank if you don't take it, e.g. EEE-only or ECE-only slots). "Classes held" is estimated from the timetable and semester start; type the real number for exact results. Each period counts as one class. Semester dates and holidays are assumptions: edit them to match your academic calendar.</p>
+</section>
+
+<section class="card" id="settings">
+  <details><summary>Room settings (AC / seats) and data notes</summary>
+    <p class="sub" style="margin:8px 0">The PDFs list which room each class uses but not AC or capacity, so tick AC rooms and enter seats here (saved in your browser); the AI finder and AC filter use it. Floors are inferred from room numbers (1xx = Ground, 2xx = First … 7xx = Sixth; IST 20/21 workshop = Ground). Cells without a room number (Che lab, Yoga, some PPS lab slots) are not shown. Year I uses the 9-period bell (9:00–17:05); Year II the 9:00–16:50 bell.</p>
+    <div id="tt"></div>
+  </details>
+</section>
+</main>
+<script>
+const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],CODE={M:0,T:1,W:2,R:3,F:4},OPEN=9,CLOSE=17.09;
+const FL=["Ground floor","First floor","Second floor","Third floor","Fourth floor","Fifth floor","Sixth floor"];
+const hm=s=>{const[a,b]=s.split(":");return +a+(b?+b/60:0)};
+const fmt=h=>{const H=Math.floor(h+1e-6),M=Math.round((h-H)*60);return String(H).padStart(2,"0")+":"+String(M).padStart(2,"0")};
+const dur=m=>m>=60?(Math.floor(m/60)+"h"+(m%60?" "+m%60+"m":"")):m+"m";
+// Period timings read from the PDFs (Year I: 9 periods, Year II: with tea breaks)
+const PER={1:"9:00-9:50 9:55-10:45 10:50-11:40 11:45-12:35 12:35-13:30 13:30-14:20 14:25-15:15 15:20-16:10 16:15-17:05".split(" "),2:"9:00-9:50 9:50-10:40 10:50-11:40 11:40-12:30 12:30-13:20 13:20-14:10 14:10-15:00 15:10-16:00 16:00-16:50".split(" ")};
+const ES="Electronic System & PCB Design",BIO="Biology";
+const N={A:"Advanced Calculus & Complex Analysis",B:"Chemistry",D:"Programming for Problem Solving",E:"Philosophy of Engineering"};
+const L1={German:["German","Mr. Selva"],Japanese:["Japanese","Mr. Nadeem"],NSS:["NSS","Dr. R. Manickam"],Workshop:["Basic Civil & Mechanical Workshop","Mech Dept"]};
+const Y1=(a,b,c,d,e,f,g)=>({...L1,A:[N.A,a],B:[N.B,b],C:c,D:[N.D,d],E:[N.E,e],F:f,G:g});
+const B2={A:["Transforms & Boundary Value Problems","Dr. C. Arun Kumar"],B:["Solid State Devices","Dr. Jeevanantham S"],C:["Computer Organization & Architecture","Dr. P. Murugapandiyan"],D:["Digital Logic Design","Dr. S. Krishnakumar"],E:["EM Theory & Interference","Dr. V. Bharathi"],F:["Professional Ethics","Dr. Jothi M"],G:["Universal Human Values-II","Mrs. N. Suganthi"],H:["Verbal Reasoning","CDC"],I:["Social Engineering","Mrs. D. Lavanya"],LAB:["Devices & Digital IC Lab","Dr. Jeevanantham S, Dr. V. Bharathi"]};
+// Cell format: DayPeriod[-Period]:Slot@Room  (numeric room = IST block). Cells with no room number in the PDF (Che lab, Yoga, PPS lab...) are skipped.
+const SECS=[
+{n:"II ECE-DS A",y:2,s:B2,t:"M1:E@416 M2:A@416 M3-4:I@416 M6-7:G@G-602 M8-9:LAB@LAB309/107 T1:C@416 T2:A@416 T3:E@416 T4:D@416 T6:G@G-602 T8-9:H@H-TB-106 W1:A@416 W2:B@416 W3:C@416 W4:D@416 W7:H@H-TB-106 R1:B@416 R2:C@416 R3:A@416 R4:F@416 R6-7:LAB@LAB309/107 F1:D@416 F2:B@416 F3:E@416 F4:C@416"},
+{n:"II ECE-DS B",y:2,s:{...B2,A:["Transforms & Boundary Value Problems","NEW FACULTY 3"],F:["Professional Ethics","Dr. K. Vigneshwaran"],G:["Universal Human Values-II","Mrs. D. Lavanya"],LAB:["Devices & Digital IC Lab","Dr. S. Krishnakumar"]},t:"M3-4:LAB@LAB309/107 M6:D@411 M7:B@411 M8:C@411 M9:I@411 T1-2:LAB@LAB309/107 T6:C@411 T7:D@411 T8:E@411 T9:A@411 W1:G@G-401 W6:I@411 W7:E@411 W8:A@411 W9:D@411 R1-2:G@G-401 R3-4:H@H-TB-106 R6:A@411 R7:C@411 R8:B@411 R9:E@411 F1:H@H-TB-106 F6:F@411 F7:A@411 F8:B@411 F9:C@411"},
+{n:"I ECE-A",y:1,s:Y1("Dr. R. Ragul","Dr. P. Pachamuthu",[ES,"Dr. U. Shajith Ali"],"Dr. A. Rama Prasath","Dr. R. Aarthi",[BIO,"Dr. M. Jaya Priya"]),t:"M1:E@602 M2:E@602 M3:B@602 M4:A@602 M8:F@710 M9:CDC@710 T1:C@602 T2:B@602 T3:A@602 T4:D@602 T6-9:Workshop@20,21 W1:B@602 W2:E@602 W3:D@602 W6-7:PPS_Lab@618 W8-9:PCB_Lab@108 R1-3:German@602 R4:A@602 R6-7:CDC@510 R8-9:NSS@201 F1:D@602 F2:A@602 F3:C@602 F4:B@602 F6:F@602 F7-9:German@626"},
+{n:"I ECE-B / EEE",y:1,s:Y1("Dr. M. Deepa","Dr. N. Prabhu",[BIO,"Dr. M. Jaya Priya"],"Dr. A. Rama Prasath","Dr. R. Aarthi",[ES+" (ECE)","Dr. U. Shajith Ali"],["Electrical Circuits (EEE)","Dr. Dheepanchakkravarthy"]),t:"M1:CDC@609 M2:F@710 M2:G@520 M6:E@602 M7:E@602 M8:B@602 M9:A@602 T1-4:Workshop@20,21 T6:C@602 T7:B@602 T8:A@602 T9:D@602 W1:F@710 W1:G@520 W2:PPS_Lab@617 W3-4:CDC@510 W5:PPS_Lab@618 W7:B@602 W8:E@602 W9:D@602 R1-2:NSS@201 R3:C@626 R4:A@710 R6:D@602 R7-9:German@602 F1-2:PCB_Lab@617 F4-6:German@626"},
+{n:"I ECE-DS",y:1,s:Y1("Dr. Pandiyarajan","Dr. Ujjwala",[ES,"Dr. V.N. Senthil Kumaran"],"Mrs. R. Sharanya","Dr. R. Ramesh",[BIO,"Dr. M. Maria Leena"]),t:"M1:F@710 M3-4:PCB_Lab@617 M6:E@502 M7:E@502 M8:B@502 M9:A@502 T3-4:NSS@201 T6:C@502 T7:B@502 T8:A@502 T9:D@502 W1-2:CDC@510 W3:A@710 W5-6:PPS_Lab@617 W7:B@502 W8:E@502 W9:D@502 R1:F@710 R2:A@510 R3:D@710 R4-5:German@502 R8:C@502 R9:B@502 F1-3:German@626 F6-9:Workshop@20,21"},
+{n:"I Biotech-B",y:1,s:Y1("Dr. R. Suresh","Dr. R. Logudurai",["Cell Biology","Dr. Daniel Paul"],"Dr. B. Chitradevi","Dr. J. Ramya Parkavi",["Biochemistry","Dr. M. Jaya Priya"],["Human Physiology & Anatomy (Biomed)",""]),t:"M1:C@520 M4:F@710 M4:G@520 M6:E@702 M7:E@702 M8:A@702 M9:B@702 T1-2:CDC@710 T3:C@520 T4:F@710 T7:B@702 T8:A@702 T9:D@702 W1-4:Workshop@20,21 W6:D@702 W7:B@702 W8:E@702 W9:D@702 R3:A@710 R4:C@510 R4:G@520 R6:B@702 R7-9:Japanese@702 F1:F@702 F2:CDC@702 F3:A@702 F4-6:Japanese@702"}];
+const rooms={},rid=x=>/^\d+$/.test(x)?"IST "+x:x.replace("LAB","LAB ");
+SECS.forEach(S=>S.t.split(" ").forEach(it=>{const m=it.match(/^([MTWRF])(\d)(?:-(\d))?:([^@]+)@(.+)$/);if(!m)return;
+  const P=PER[S.y],a=hm(P[m[2]-1].split("-")[0]),b=hm(P[(m[3]||m[2])-1].split("-")[1]),[sub,fac]=S.s[m[4]]||[m[4].replace(/_/g," ")];
+  m[5].split(",").forEach(x=>{const id=rid(x),r=rooms[id]=rooms[id]||{id,slots:[[],[],[],[],[]]};r.slots[CODE[m[1]]].push({s:a,e:b,n:[sub,fac,S.n].filter(Boolean).join(" · ")})})}));
+const ROOMS=Object.values(rooms);
+ROOMS.forEach(r=>{const n=+r.id.match(/\d+/)[0];r.floor=n<100?0:Math.floor(n/100)-1;r.lab=/LAB|IST (617|618|108|20|21)$/.test(r.id);r.slots.forEach(a=>a.sort((x,y)=>x.s-y.s))});
+ROOMS.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id,undefined,{numeric:true}));
+let META={};try{META=JSON.parse(localStorage.getItem("fr_meta")||"{}")}catch(e){}
+const applyMeta=()=>ROOMS.forEach(r=>{const m=META[r.id]||{};r.ac=m.ac??null;r.cap=m.cap||null});applyMeta();
+// status of room at day d, time t
+function status(r,d,t){const sl=d>4?[]:r.slots[d];
+  const cur=sl.find(x=>t>=x.s&&t<x.e);
+  if(t<OPEN||t>=CLOSE)return{free:false,closed:true,until:t<OPEN?OPEN:null,note:"Closed"};
+  if(cur){let end=cur.e;for(const x of sl)if(x.s<=end&&x.e>end)end=x.e;return{free:false,until:end,note:cur.n}}
+  const nx=sl.find(x=>x.s>t);return{free:true,until:nx?nx.s:CLOSE,next:nx}}
+const $=id=>document.getElementById(id);
+const sd=$("day"),st=$("time");
+DAYS.forEach((n,i)=>sd.add(new Option(n,i)));
+function setNow(){const n=new Date();sd.value=(n.getDay()+6)%7;st.value=fmt(n.getHours()+n.getMinutes()/60);}
+setNow();
+function tags(r){return `<span class="tag">${r.lab?"Lab":"Classroom"}</span><span class="tag">${r.ac==null?"AC ?":r.ac?"AC":"Non-AC"}</span>${r.cap?`<span class="tag">${r.cap} seats</span>`:""}`}
+function renderGrid(hits){if(hits)HITS=hits;hits=HITS;
+  const d=+sd.value,t=hm(st.value||"12:00"),fa=$("fac").value,fs=$("fst").value,ft=$("ftype").value;let html="";
+  [...new Set(ROOMS.map(r=>r.floor))].sort().forEach(f=>{
+    let rs=ROOMS.filter(r=>r.floor===f&&(fa===""||r.ac===(fa==="1"))&&(ft===""||r.lab===(ft==="lab")));
+    const info=rs.map(r=>({r,s:status(r,d,t)}));const nfree=info.filter(x=>x.s.free).length;
+    const shown=info.filter(x=>fs!=="free"||x.s.free);
+    html+=`<div class="floor"><h3>${FL[f]||"Floor "+f}<span>${nfree} of ${info.length} free</span></h3><div class="grid">`+
+    (shown.length?shown.map(({r,s})=>`<div data-id="${r.id}" class="room ${s.free?"free":"busy"} ${hits&&hits.includes(r.id)?"hit":""}">
+      <div class="top"><span>${r.id}</span><span class="st">${s.free?"Free":s.closed?"Closed":"In use"}</span></div>
+      <div class="meta">${tags(r)}</div>
+      <div class="meta">${s.free?`Free until <b>${fmt(s.until)}</b>${s.next?" · next: "+s.next.n:""}`:s.closed?"Outside 09:00–17:05":`${s.note} · until <b>${fmt(s.until)}</b>`}</div></div>`).join(""):`<div class="empty">No rooms match.</div>`)+`</div></div>`});
+  $("grid").innerHTML=html}
+["day","time","fac","fst","ftype"].forEach(i=>$(i).addEventListener("change",()=>{HITS=[];if(i==="day"||i==="time"){LIVE=false;setDemo()}renderGrid();tickMap()}));
+$("now").onclick=()=>{setNow();LIVE=true;HITS=[];renderGrid();tickMap()};
+function renderTT(){$("tt").innerHTML="<table><tr><th>Room</th><th>Floor</th><th>Type</th><th>AC</th><th>Seats</th><th>Classes/wk</th></tr>"+ROOMS.map(r=>`<tr><td>${r.id}</td><td>${FL[r.floor]}</td><td>${r.lab?"Lab":"Classroom"}</td><td><input type="checkbox" data-id="${r.id}" data-k="ac" ${r.ac?"checked":""}></td><td><input type="number" min="0" style="width:64px" data-id="${r.id}" data-k="cap" value="${r.cap||""}"></td><td>${r.slots.flat().length}</td></tr>`).join("")+"</table>"}
+$("tt").addEventListener("change",e=>{const i=e.target.dataset;if(!i.id)return;const m=META[i.id]=META[i.id]||{};m[i.k]=i.k==="ac"?e.target.checked:+e.target.value||null;try{localStorage.setItem("fr_meta",JSON.stringify(META))}catch(x){}applyMeta();renderGrid()});
+renderTT();
+
+// ---------- AI Room Finder ----------
+const EX=["I need an AC room on the ground floor for me and my team for the next 2 hours","Any room on the fifth floor for 45 minutes","Free classroom at 2pm tomorrow for 90 minutes","Any free room for the next hour"];
+EX.forEach(e=>{const b=document.createElement("button");b.className="chip";b.textContent=e;b.onclick=()=>{$("q").value=e;run()};$("ex").appendChild(b)});
+$("go").onclick=run;$("q").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey))run()});
+
+// Fallback parser when AI is unavailable
+function localParse(q){const s=q.toLowerCase(),o={ac:null,floor:null,minCapacity:null,durationMin:60,startTime:null,day:null};
+  if(/non[- ]?ac|without ac|no ac|non air/.test(s))o.ac=false;else if(/\bac\b|a\/c|air[- ]?condition|cool/.test(s))o.ac=true;
+  if(/ground|\bgf\b/.test(s))o.floor=0;else{const w={first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,"1st":1,"2nd":2,"3rd":3,"4th":4,"5th":5,"6th":6};let m=s.match(/\b(first|second|third|fourth|fifth|sixth|1st|2nd|3rd|4th|5th|6th)\s+floor/)||s.match(/floor\s*(\d)/)||s.match(/\b(\d)(?:st|nd|rd|th)?\s+floor/);if(m)o.floor=w[m[1]]??+m[1]}
+  let m=s.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b/);if(m)o.durationMin=Math.round(+m[1]*60);
+  else if(m=s.match(/(\d+)\s*(minutes?|mins?|m)\b/))o.durationMin=+m[1];
+  else if(/half an hour|30 min/.test(s))o.durationMin=30;else if(/an hour|one hour/.test(s))o.durationMin=60;
+  if(m=s.match(/(\d+)\s*(people|students|members|persons|of us)/))o.minCapacity=+m[1];else if(/team|group|friends/.test(s))o.minCapacity=6;
+  if(m=s.match(/\bat\s*(\d{1,2})(?::(\d\d))?\s*(am|pm)?/)){let h=+m[1];if(m[3]==="pm"&&h<12)h+=12;if(m[3]==="am"&&h===12)h=0;if(!m[3]&&h<8)h+=12;o.startTime=fmt(h+(m[2]?+m[2]/60:0))}
+  if(/tomorrow/.test(s))o.day=((new Date().getDay()+6)%7+1)%7;
+  DAYS.forEach((n,i)=>{if(s.includes(n.toLowerCase()))o.day=i});return o}
+
+async function aiParse(q){
+  let sample=null;try{sample=window.claude&&claude.use?await claude.use("sample"):null}catch(e){}
+  if(!sample)return null;
+  const n=new Date(),now=`${DAYS[(n.getDay()+6)%7]} ${fmt(n.getHours()+n.getMinutes()/60)}`;
+  const prompt=`You extract room-search criteria from a student's request. Current time: ${now}. Floors: 0=ground,1=first,2=second,3=third,4=fourth,5=fifth,6=sixth. Rooms: ${ROOMS.map(r=>r.id+" (floor "+r.floor+")").join(", ")}.
+Request: "${q}"
+Return ONLY JSON: {"ac":true|false|null,"floor":0-3|null,"minCapacity":number|null (infer ~6 for "team"/"group", 1 for "me"),"durationMin":number (default 60; "next 2 hours"=120),"startTime":"HH:MM"|null (null = now),"day":0-6 (Mon=0)|null (null=today)}`;
+  try{const j=await sample.json(prompt,{modelTier:"quick"});return j}catch(e){return null}}
+
+async function run(){
+  const q=$("q").value.trim();if(!q)return;const b=$("go");b.disabled=true;b.textContent="Thinking…";
+  $("res").innerHTML="";$("crit").textContent="";
+  let c=await aiParse(q),via="AI";if(!c||typeof c!=="object"){c=localParse(q);via="built-in parser"}
+  const l=localParse(q);
+  const d=c.day!=null?+c.day:(l.day!=null?l.day:simNow().d);
+  const now=new Date(),t0=c.startTime?hm(c.startTime):(l.startTime?hm(l.startTime):simNow().t);
+  const dm=+c.durationMin||60,cap=c.minCapacity||null,ac=c.ac,fl=c.floor;
+  const hits=[];
+  ROOMS.forEach(r=>{
+    if(ac!=null&&r.ac!==ac)return;if(fl!=null&&r.floor!==+fl)return;if(cap&&r.cap&&r.cap<cap)return;
+    const s=status(r,d,t0);if(!s.free)return;const room=(s.until-t0)*60;
+    if(room+1e-6<dm)return;hits.push({r,s,room})});
+  hits.sort((a,b)=>a.room-b.room); // tightest fit first, keeps long-free rooms for others
+  $("crit").innerHTML=`Understood (${via}): <b>${DAYS[d]} ${fmt(t0)}</b> · <b>${dur(dm)}</b>`+(ac==null?"":` · <b>${ac?"AC":"Non-AC"}</b>`)+(fl==null?"":` · <b>${FL[fl]||"Floor "+fl}</b>`)+(cap?` · <b>${cap}+ seats</b>`:"");
+  $("res").innerHTML=hits.length?hits.map(({r,s,room})=>`<div class="hitrow" data-id="${r.id}"><div><b>${r.id}</b> · ${FL[r.floor]}<div class="meta" style="font-size:12.5px;color:var(--mut)">${tags(r)}</div></div><div style="text-align:right">Free until <b>${fmt(s.until)}</b><div style="font-size:12.5px;color:var(--mut)">${dur(Math.round(room))} available</div></div></div>`).join(""):`<div class="empty">${ac!=null&&!ROOMS.some(r=>r.ac!=null)?"The timetables don't say which rooms are AC. Tick AC rooms under Room settings below, then search again.":"No room fits all of that. Try a shorter duration, a different floor, or relaxing AC."}</div>`;
+  $("day").value=d;st.value=fmt(t0);if(c.startTime||l.startTime||c.day!=null||l.day!=null||!LIVE){LIVE=false;setDemo()}renderGrid(hits.map(h=>h.r.id));tickMap();
+  b.disabled=false;b.textContent="Find rooms"}
+// ---------- 3D map, live countdown, call the squad ----------
+let LIVE=true,ANCH=Date.now(),BASE={d:0,t:10.5},HITS=[],SEL=null,CLAIMS={},RX=68,RZ=-18,lastMin=-1;
+const SEP=112,RM=Object.fromEntries(ROOMS.map(r=>[r.id,r])),FLS=[...new Set(ROOMS.map(r=>r.floor))].sort((a,b)=>a-b);
+const t12=h=>{let H=Math.floor(h+1e-6),M=Math.round((h-H)*60);if(M==60){H++;M=0}return(H%12||12)+":"+String(M).padStart(2,"0")+" "+(H>=12?"PM":"AM")};
+const hms=x=>{x=Math.max(0,Math.round(x));return[x/3600|0,(x/60|0)%60,x%60].map(v=>String(v).padStart(2,"0")).join(":")};
+function simNow(){if(LIVE){const n=new Date();return{d:(n.getDay()+6)%7,t:n.getHours()+n.getMinutes()/60+n.getSeconds()/3600}}return{d:BASE.d,t:BASE.t+(Date.now()-ANCH)/3.6e6}}
+function setDemo(){BASE={d:+sd.value,t:hm(st.value||"10:30")};ANCH=Date.now()}
+{const n=simNow();if(n.d>4||n.t<OPEN||n.t>=CLOSE){LIVE=false;sd.value=0;st.value="10:30";setDemo();renderGrid()}}
+const stg=$("stage");
+$("bld").innerHTML=FLS.map(f=>`<div class="fl" style="--z:${f*SEP}px"><div class="fltag">${FL[f]}</div>${ROOMS.filter(r=>r.floor===f).map(r=>`<div class="tile" data-id="${r.id}"><b>${r.id.replace("IST ","")}</b><i></i></div>`).join("")}</div>`).join("");
+function applyView(){const sc=Math.min(1.1,stg.clientWidth/400)*.92;$("bld").style.transform=`translateY(45px) scale(${sc}) rotateX(${RX}deg) rotateZ(${RZ}deg) translateZ(-${(FLS.length-1)*SEP/2}px)`}
+applyView();addEventListener("resize",applyView);$("reset").onclick=()=>{RX=68;RZ=-18;applyView()};
+let drag=null;
+stg.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,z:RZ,r:RX,m:0};stg.setPointerCapture(e.pointerId)});
+stg.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.m=Math.max(drag.m,Math.abs(dx)+Math.abs(dy));if(drag.m>6){RZ=drag.z+dx*.4;RX=Math.min(80,Math.max(25,drag.r-dy*.3));applyView()}});
+stg.addEventListener("pointerup",e=>{if(drag&&drag.m<=6){const t=document.elementFromPoint(e.clientX,e.clientY)?.closest(".tile");if(t)select(t.dataset.id)}drag=null});
+$("grid").addEventListener("click",e=>{const c=e.target.closest(".room");if(c){select(c.dataset.id);stg.scrollIntoView({behavior:"smooth",block:"center"})}});
+$("res").addEventListener("click",e=>{const c=e.target.closest(".hitrow");if(c){select(c.dataset.id);stg.scrollIntoView({behavior:"smooth",block:"center"})}});
+function invite(r){const{d,t}=simNow(),s=status(r,d,t);return`📍 Heading to ${r.id}. It's free until ${t12(s.until)}. Come fast!\n${FL[r.floor]} · ${r.lab?"Lab":"Classroom"}`}
+function select(id){SEL=id;const r=RM[id],c=!!CLAIMS[id];
+  $("panel").innerHTML=`<div class="pn"><div><h3>${r.id} <small>${FL[r.floor]} · ${r.lab?"Lab":"Classroom"}</small></h3><div id="pst" style="font-weight:600"></div><div id="psub" class="meta" style="font-size:13px;color:var(--mut)"></div><div class="acts"><button id="claim">${c?"Release room":"Claim this room"}</button><a id="wa" class="btn wa" target="_blank" rel="noopener">📣 Call the Squad</a><button class="ghost" id="cp">Copy invite</button></div></div><div class="cdw"><div id="pl" class="cdl"></div><div id="pcd" class="cd">--:--:--</div><div class="bar"><div id="pbar" style="width:0"></div></div></div></div>`;
+  $("claim").onclick=()=>{if(CLAIMS[id])delete CLAIMS[id];else CLAIMS[id]=true;select(id)};
+  $("cp").onclick=async()=>{try{await navigator.clipboard.writeText(invite(r));$("cp").textContent="Copied ✓"}catch(e){$("cp").textContent="Copy failed"}};
+  tickMap()}
+function updatePanel(){const r=RM[SEL];if(!r)return;const{d,t}=simNow(),s=status(r,d,t),c=!!CLAIMS[SEL],left=s.until==null?0:(s.until-t)*3600;let lab,st,sub;
+  if(s.closed){lab="Campus is closed";st="🔒 Closed";sub="Classes run 09:00 to 17:05"}
+  else if(s.free){lab=s.next?"Next class starts in":"No more classes today · closing in";st="✅ Free right now";sub=s.next?`Next: ${s.next.n} at ${t12(s.until)}`:`Free until closing at ${t12(s.until)}`}
+  else{const e=status(r,d,s.until+1e-4);lab="Class ends in";st="⛔ In class";sub=`${s.note} · then free until ${t12(e.until||s.until)}`}
+  $("pl").textContent=lab;$("pcd").textContent=s.closed?"--:--:--":hms(left);$("pbar").style.width=Math.min(100,left/72)+"%";
+  $("pst").textContent=st+(c?" · 🔵 Claimed by you":"");$("psub").textContent=sub;
+  $("claim").disabled=!c&&!s.free;$("claim").textContent=c?"Release room":s.free?"Claim this room":"Not free";
+  const ok=c&&s.free;$("wa").style.display=ok?"inline-block":"none";$("cp").style.display=ok?"inline-block":"none";
+  if(ok)$("wa").href="https://wa.me/?text="+encodeURIComponent(invite(r));
+  if(c&&!s.free&&!s.closed)$("psub").textContent="⚠️ Your claimed room is no longer free. "+sub}
+function tickMap(){const{d,t}=simNow();
+  document.querySelectorAll(".tile").forEach(el=>{const r=RM[el.dataset.id],s=status(r,d,t),left=s.until==null?0:(s.until-t)*60;
+    el.className="tile "+(s.closed?"closed":s.free?(left<=15?"soon":"free"):"busy")+(SEL===r.id?" sel":"")+(CLAIMS[r.id]?" claim":"")+(HITS.includes(r.id)?" hit":"");
+    el.lastChild.textContent=s.closed?"closed":s.free?dur(Math.round(left)):"busy"});
+  $("stat").textContent="● "+ROOMS.filter(r=>status(r,d,t).free).length+" of "+ROOMS.length+" rooms free now";$("clock").textContent=DAYS[d]+" "+t12(t);$("mode").textContent=LIVE?"● Live":"Demo time (campus closed now) · clock is running, press Now for live";
+  updatePanel()}
+setInterval(()=>{if(LIVE){const n=new Date();if(n.getMinutes()!==lastMin){lastMin=n.getMinutes();setNow();renderGrid()}}tickMap()},1000);
+// ---------- Attendance planner ----------
+const EXTRA={"I ECE-A":"M6-7:Che_lab","I ECE-B / EEE":"M3-4:Che_lab","I ECE-DS":"M2:CDC T1-2:Che_lab F4:PPS_Lab","I Biotech-B":"M2-3:Yoga R1-2:Che_lab F8-9:PPS_Lab"};
+const ymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const fd=d=>d.toLocaleDateString(undefined,{day:"numeric",month:"short"});
+function cellsOf(S){const o=[];(S.t+" "+(EXTRA[S.n]||"")).split(" ").forEach(it=>{const m=it.match(/^([MTWRF])(\d)(?:-(\d))?:([^@]+)/);if(!m)return;for(let q=+m[2];q<=+(m[3]||m[2]);q++)o.push({k:m[4],d:CODE[m[1]],p:q})});return o}
+function cnt(S,cells,a,b,mode,hol){const r={},T=new Date(),tn=ymd(T),nt=T.getHours()+T.getMinutes()/60;
+  for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1)){const wd=(d.getDay()+6)%7;if(wd>4||hol.has(ymd(d)))continue;const isT=ymd(d)===tn;
+    cells.forEach(c=>{if(c.d!==wd)return;if(isT){const started=hm(PER[S.y][c.p-1].split("-")[0])<=nt;if((mode==="past"&&!started)||(mode==="future"&&started))return}r[c.k]=(r[c.k]||0)+1})}return r}
+const need=(p,a,h,R)=>Math.max(0,Math.ceil(p/100*(h+R)-a-1e-9));
+let CUR=null;
+SECS.forEach((S,i)=>$("asec").add(new Option(S.n,i)));
+function buildAtt(){const S=SECS[+$("asec").value],cells=cellsOf(S);CUR={S,cells};
+  const keys=[...new Set(cells.map(c=>c.k))].sort((a,b)=>(a.length>1)-(b.length>1)||a.localeCompare(b));CUR.keys=keys;
+  $("atab").innerHTML=keys.map(k=>{const[n,f]=S.s[k]||[k.replace(/_/g," ")],w=cells.filter(c=>c.k===k).length;
+    return`<div class="acard" data-k="${k}"><div class="ahd"><b>${n}</b>${k.length===1?" <span class='tag'>slot "+k+"</span>":""}<small>${f||""}${f?" · ":""}${w} periods/week</small></div><div class="ain"><label>Attendance %<input type="number" class="ap" min="0" max="100" step="0.1" placeholder="e.g. 82"></label><label>Classes held so far<input type="number" class="ah2" min="0" step="1"></label></div><div class="ares"></div></div>`}).join("");calcAtt()}
+function calcAtt(){if(!CUR)return;const{S,cells,keys}=CUR,T0=new Date();T0.setHours(0,0,0,0);
+  const P=v=>new Date(v+"T00:00:00"),st=P($("ast").value),en=P($("aen").value);let pd=$("apd").value?P($("apd").value):T0;if(pd<T0)pd=T0;if(pd>en)pd=en;
+  const hol=new Set($("ahol").value.match(/\d{4}-\d{2}-\d{2}/g)||[]),D=+$("adz").value||75,G=+$("atg").value||90;
+  const est=cnt(S,cells,st,T0,"past",hol),R=cnt(S,cells,T0,en,"future",hol),Rp=cnt(S,cells,T0,pd,"future",hol);
+  let wd=0;for(let d=new Date(T0);d<=en;d.setDate(d.getDate()+1)){const w=(d.getDay()+6)%7;if(w<5&&!hol.has(ymd(d)))wd++}
+  const bad=[];let sA=0,sH=0,sR=0,totR=0,totRp=0;
+  const dend=en.getMonth()<10&&en.getFullYear()<=2026?"before November":"before the semester ends on "+fd(en);
+  document.querySelectorAll(".acard").forEach(card=>{const k=card.dataset.k,[n]=S.s[k]||[k.replace(/_/g," ")],r=R[k]||0,rp=Rp[k]||0;totR+=r;totRp+=rp;
+    const hi=card.querySelector(".ah2");hi.placeholder="~"+(est[k]||0)+" (estimated)";
+    const pv=card.querySelector(".ap").value,out=card.querySelector(".ares"),L=[`<div>📚 <b>${r}</b> classes left in the semester · <b>${rp}</b> of them before ${fd(pd)}</div>`];
+    if(pv===""){out.innerHTML=L.join("");return}
+    const pct=Math.min(100,Math.max(0,+pv)),h=hi.value!==""?+hi.value:(est[k]||0),a=Math.round(pct*h/100),max=(h+r)?(a+r)/(h+r)*100:pct;sA+=a;sH+=h;sR+=r;
+    const xD=need(D,a,h,r),xG=need(G,a,h,r),cls=pct<D?"c-bad":pct<G?"c-warn":"c-ok";
+    L[0]=L[0].replace("<div>",`<div><span class="chip2 ${cls}" style="margin:0 6px 0 0">${pct<D?"DANGER":pct<G?"Safe, below "+G+"%":"Above "+G+"%"}</span>`);
+    if(xD>r){bad.push(`${n}: ${pct}% now, best possible ${max.toFixed(1)}%`);L.push(`<div style="color:var(--busy);font-weight:700">⛔ IRREVERSIBLE DETENTION: even attending all ${r} remaining classes you finish at ${max.toFixed(1)}%, below ${D}%.</div>`)}
+    else L.push(`<div>🛡️ To stay out of the danger zone (${D}%): attend at least <b>${xD}</b> of ${r} (you can miss ${r-xD}).</div>`);
+    L.push(xG>r?`<div>🎯 ${G}% is out of reach: the most you can finish with is <b>${max.toFixed(1)}%</b>.</div>`:pct>=G?`<div>✅ To stay above ${G}%: attend at least <b>${xG}</b> of ${r} (you can miss ${r-xG}).</div>`:`<div>🎯 To reach ${G}%: attend at least <b>${xG}</b> of ${r} (you can miss ${r-xG}).</div>`);
+    const pD=need(D,a,h,rp),pG=need(G,a,h,rp);
+    L.push(`<div>📅 By ${fd(pd)} (${rp} classes): ${pD>rp?`can't reach ${D}% by then (max ${((a+rp)/(h+rp)*100).toFixed(1)}%)`:`attend ${pD} for ${D}%`}; ${pG>rp?`${G}% not reachable by then`:`attend ${pG} for ${G}%`}.</div>`);
+    out.innerHTML=L.join("")});
+  let ov="—";if(sH){const o=sA/sH*100,om=(sA+sR)/(sH+sR)*100;ov=o.toFixed(1)+"%";if(om<D)bad.push(`Overall attendance: ${o.toFixed(1)}% now, best possible ${om.toFixed(1)}%`)}
+  $("aalert").innerHTML=bad.length?`<div class="alarm" role="alert"><h3>🚨 IRREVERSIBLE DETENTION ALERT 🚨</h3><div>It is mathematically impossible to recover ${dend}, even if you attend every remaining class:</div>${bad.map(b=>`<div>• ${b}</div>`).join("")}<div style="margin-top:8px">Contact your class advisor / HoD now about condonation options.</div></div>`:"";
+  const T=new Date();$("atoday").textContent="Today is "+T.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"})+" · planning date "+fd(pd)+" · danger below "+D+"% · target "+G+"%";
+  $("asum").innerHTML=[[wd,"working days left"],[totR,"total classes left in semester"],[totRp,"classes before "+fd(pd)],[ov,"overall attendance now"]].map(([b,t])=>`<div class="stat"><b>${b}</b><span>${t}</span></div>`).join("")}
+$("asec").onchange=buildAtt;
+["apd","adz","atg","ast","aen","ahol"].forEach(i=>$(i).addEventListener("input",calcAtt));
+$("atab").addEventListener("input",calcAtt);
+{const t=new Date();t.setDate(t.getDate()+14);$("apd").value=ymd(t)>$("aen").value?$("aen").value:ymd(t)}
+buildAtt();
+renderGrid();tickMap();
+</script></body></html>
